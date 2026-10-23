@@ -1,6 +1,6 @@
 import streamlit as st
 from engine import profile, recommend_sort, recommend_search
-from c_engine import insertion_sort as c_insertion_sort
+
 st.set_page_config(
     page_title="Algorithm Recommender",
     page_icon="◉",
@@ -52,7 +52,7 @@ st.markdown(
         color: var(--ink) !important;
     }
 
-    /* The actual Streamlit page surface — explicit selectors avoid theme inheritance. */
+    /* The actual Streamlit page surface â€” explicit selectors avoid theme inheritance. */
     [data-testid="stAppViewContainer"] {
         background: #aaa8a5 !important;
     }
@@ -432,7 +432,7 @@ with st.sidebar:
             st.error("Enter 1 to 100000 valid integers.")
         else:
             st.session_state.p = profile(a)
-            st.session_state.input_values = a
+            st.session_state.visual_input = a.copy()
             st.session_state.last = recommend_sort(st.session_state.p) if len(a) > 1 else None
             if st.session_state.last:
                 hist.append(st.session_state.last)
@@ -522,22 +522,6 @@ with tab_sort:
 
     if st.button("Recommend sorting algorithm", type="primary"):
         commit(recommend_sort(p, linked, stable, worst, mem and not linked))
-        st.markdown(
-        '<div class="section-sub">Run the native C implementation on your analyzed data.</div>',
-        unsafe_allow_html=True,
-    )
-
-    if st.button("Execute C Insertion Sort"):
-        raw_values = st.session_state.get("input_values")
-
-        if raw_values is None:
-            st.info("Analyze your data again before running the C sort.")
-        else:
-            result = c_insertion_sort(raw_values)
-            st.success("C insertion sort completed.")
-            st.write("Sorted array:", result["sorted"])
-            st.write("Comparisons:", result["comparisons"])
-            st.write("Element shifts:", result["shifts"])
 
 with tab_search:
     st.markdown('<div class="section-head">Searching strategy</div>', unsafe_allow_html=True)
@@ -628,3 +612,166 @@ if r:
 
     with st.expander("Raw JSON output"):
         st.json(r)
+
+# ---------- Interactive Algorithm Lab (upgrade) ----------
+# This section adds a real, step-by-step visualizer and measured benchmark.
+# The original recommender and its five-point explanation remain unchanged.
+import time as _time
+
+
+def _trace_sort(values, algorithm):
+    """Return real intermediate array states for a small educational demo."""
+    a = list(values)
+    states = [(a.copy(), "Initial array")]
+    comparisons = 0
+    writes = 0
+    n = len(a)
+    if algorithm == "Insertion Sort":
+        for i in range(1, n):
+            key = a[i]
+            j = i - 1
+            while j >= 0:
+                comparisons += 1
+                if a[j] <= key:
+                    break
+                a[j + 1] = a[j]
+                writes += 1
+                j -= 1
+            a[j + 1] = key
+            writes += 1
+            states.append((a.copy(), f"Insert {key} into the sorted left portion (pass {i})"))
+    elif algorithm == "Bubble Sort":
+        for i in range(n - 1):
+            swapped = False
+            for j in range(n - i - 1):
+                comparisons += 1
+                if a[j] > a[j + 1]:
+                    a[j], a[j + 1] = a[j + 1], a[j]
+                    writes += 2
+                    swapped = True
+            states.append((a.copy(), f"Pass {i + 1}: largest remaining value moves right"))
+            if not swapped:
+                states.append((a.copy(), "No swaps in this pass — array is sorted"))
+                break
+    else:  # Selection Sort
+        for i in range(n - 1):
+            min_idx = i
+            for j in range(i + 1, n):
+                comparisons += 1
+                if a[j] < a[min_idx]:
+                    min_idx = j
+            if min_idx != i:
+                a[i], a[min_idx] = a[min_idx], a[i]
+                writes += 2
+            states.append((a.copy(), f"Pass {i + 1}: place the smallest remaining value at index {i}"))
+    return states, comparisons, writes
+
+
+def _python_insertion(values):
+    a = list(values)
+    comparisons = shifts = 0
+    for i in range(1, len(a)):
+        key = a[i]
+        j = i - 1
+        while j >= 0:
+            comparisons += 1
+            if a[j] <= key:
+                break
+            a[j + 1] = a[j]
+            shifts += 1
+            j -= 1
+        a[j + 1] = key
+    return {"sorted": a, "comparisons": comparisons, "shifts": shifts}
+
+
+st.markdown('<div class="section-head">Interactive algorithm lab</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-sub">Explore actual sorting steps and compare measured runtimes. '
+    'The visualizer is intentionally limited to small arrays so every state stays readable.</div>',
+    unsafe_allow_html=True,
+)
+
+lab_visual, lab_bench = st.tabs(["Step-by-step visualizer", "Python vs C benchmark"])
+with lab_visual:
+    visual_cols = st.columns([1, 1, 2])
+    with visual_cols[0]:
+        visual_algorithm = st.selectbox("Algorithm", ["Insertion Sort", "Bubble Sort", "Selection Sort"])
+    with visual_cols[1]:
+        visual_limit = st.slider("Values to visualize", min_value=2, max_value=20, value=min(10, p["n"]))
+    with visual_cols[2]:
+        st.caption("Source: the values from your last Analyze data action")
+    source_values = list(st.session_state.get("visual_input", []))
+    if not source_values:
+        # profile() stores metrics, not the original values; use a stable demo sample if the
+        # original array wasn't persisted by an older version of the app.
+        source_values = [42, 7, 19, 3, 56, 28, 11, 9, 34, 2]
+        st.info("This app version stores the data profile, not the original array. The visualizer is using its sample array. Re-analyze data to refresh the recommendation; the visualizer sample is independent.")
+    source_values = source_values[:visual_limit]
+    states, total_comparisons, total_writes = _trace_sort(source_values, visual_algorithm)
+    st.session_state.setdefault("visual_step", 0)
+    step = st.slider("Execution step", min_value=0, max_value=len(states) - 1, value=min(st.session_state.visual_step, len(states) - 1), key="visual_step_slider")
+    st.session_state.visual_step = step
+    current, description = states[step]
+    st.caption(f"Step {step + 1} of {len(states)} · {description}")
+    st.bar_chart({"Value": current})
+    st.code("[" + ", ".join(map(str, current)) + "]", language="python")
+    metric_cols = st.columns(3)
+    metric_cols[0].metric("Comparisons", total_comparisons)
+    metric_cols[1].metric("Writes / moves", total_writes)
+    metric_cols[2].metric("Sorted", "Yes" if current == sorted(source_values) and step == len(states) - 1 else ("Final step only" if step != len(states) - 1 else "No"))
+    with st.expander("View all recorded states"):
+        st.dataframe(
+            [{"Step": i + 1, "Action": action, "Array": str(arr)} for i, (arr, action) in enumerate(states)],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+with lab_bench:
+    st.write("Run insertion sort on the same generated dataset in Python and, when available, the existing C wrapper.")
+    bench_n = st.slider("Benchmark array size", min_value=100, max_value=2000, value=500, step=100)
+    bench_seed = st.number_input("Repeatable dataset seed", min_value=0, max_value=999999, value=42, step=1)
+    if st.button("Run benchmark", key="run_benchmark", type="primary"):
+        import random as _random
+        _rng = _random.Random(int(bench_seed))
+        _bench_values = [_rng.randint(-10000, 10000) for _ in range(int(bench_n))]
+        _py_start = _time.perf_counter()
+        _py_result = _python_insertion(_bench_values)
+        _py_ms = (_time.perf_counter() - _py_start) * 1000
+        _c_result = None
+        _c_ms = None
+        _c_error = None
+        try:
+            from c_engine import insertion_sort as _c_insertion_sort
+            _c_start = _time.perf_counter()
+            _c_result = _c_insertion_sort(_bench_values)
+            _c_ms = (_time.perf_counter() - _c_start) * 1000
+            if not isinstance(_c_result, dict) or _c_result.get("sorted") != _py_result["sorted"]:
+                _c_error = "C output did not match Python output; C timing is not shown as valid."
+                _c_result = None
+                _c_ms = None
+        except Exception as _exc:
+            _c_error = f"C wrapper unavailable in this run: {_exc}"
+        st.session_state.benchmark_result = {
+            "n": int(bench_n), "python_ms": _py_ms, "python_result": _py_result,
+            "c_ms": _c_ms, "c_result": _c_result, "c_error": _c_error,
+        }
+    _bench = st.session_state.get("benchmark_result")
+    if _bench:
+        if _bench["n"] != int(bench_n):
+            st.caption("Showing the last run. Press Run benchmark to measure the selected size.")
+        if _bench["c_ms"] is not None and _bench["c_ms"] > 0:
+            _speedup = _bench["python_ms"] / _bench["c_ms"] if _bench["c_ms"] > 0 else 0
+            b1, b2, b3 = st.columns(3)
+            b1.metric("Python wrapper", f'{_bench["python_ms"]:.3f} ms')
+            b2.metric("C wrapper", f'{_bench["c_ms"]:.3f} ms')
+            b3.metric("Observed ratio", f'{_speedup:.2f}×' if _speedup else "—")
+            st.bar_chart({"Runtime (ms)": {"Python": _bench["python_ms"], "C": _bench["c_ms"]}})
+            st.caption("These are single-run timings on this machine; small differences are noisy. The C measurement includes Python-to-C wrapper overhead.")
+            st.success("Correctness check passed: C and Python returned the same sorted array.")
+            with st.expander("Operation counts returned by the implementations"):
+                st.json({"python": _bench["python_result"], "c": _bench["c_result"]})
+        else:
+            st.metric("Python runtime", f'{_bench["python_ms"]:.3f} ms')
+            st.warning(_bench["c_error"] or "C result unavailable; Python benchmark completed.")
+            st.caption("The Python measurement is still useful, but it is not a Python-vs-C comparison until the C wrapper loads and passes the correctness check.")
+
