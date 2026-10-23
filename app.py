@@ -919,3 +919,125 @@ if st.session_state.playground_log:
     with st.expander("Recent operations", expanded=False):
         for entry in st.session_state.playground_log:
             st.write(f"• {entry}")
+
+# ---------- Graph Traversal Lab ----------
+st.divider()
+st.subheader("Graph Traversal Lab")
+st.caption("Explore how BFS and DFS visit a graph, one step at a time. This lab runs locally in Python.")
+
+_graph_example = "A-B\nA-C\nB-D\nB-E\nC-F\nE-F"
+_graph_text = st.text_area(
+    "Edges (one per line, format: A-B)",
+    value=st.session_state.get("graph_edges_input", _graph_example),
+    height=120,
+    key="graph_edges_input",
+    help="Each line creates an undirected edge. Node labels can be letters or words. Example: Pune-Mumbai",
+)
+_g1, _g2, _g3 = st.columns([1, 1, 2])
+with _g1:
+    _graph_method = st.selectbox("Traversal", ["BFS", "DFS"], key="graph_traversal_method")
+with _g2:
+    _graph_start = st.text_input("Start node", value="A", key="graph_start_node")
+with _g3:
+    st.markdown("**BFS** explores level by level using a queue. **DFS** follows a branch using a stack.")
+
+
+def _parse_graph_edges(raw_text):
+    adjacency = {}
+    for line_number, raw_line in enumerate(raw_text.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "-" not in line:
+            raise ValueError(f"Line {line_number}: use the format NodeA-NodeB.")
+        left, right = (part.strip() for part in line.split("-", 1))
+        if not left or not right:
+            raise ValueError(f"Line {line_number}: both node labels are required.")
+        if left == right:
+            adjacency.setdefault(left, [])
+            continue
+        adjacency.setdefault(left, [])
+        adjacency.setdefault(right, [])
+        if right not in adjacency[left]:
+            adjacency[left].append(right)
+        if left not in adjacency[right]:
+            adjacency[right].append(left)
+        if len(adjacency) > 50:
+            raise ValueError("Please keep the demo graph to 50 nodes or fewer.")
+    return adjacency
+
+
+def _traverse_graph(adjacency, start, method):
+    if start not in adjacency:
+        raise ValueError(f"Start node '{start}' does not exist in the graph.")
+    visited = set()
+    order = []
+    steps = []
+    if method == "BFS":
+        from collections import deque
+        frontier = deque([start])
+        while frontier:
+            current = frontier.popleft()
+            if current in visited:
+                continue
+            visited.add(current)
+            order.append(current)
+            for neighbor in adjacency[current]:
+                if neighbor not in visited and neighbor not in frontier:
+                    frontier.append(neighbor)
+            steps.append({"Step": len(steps) + 1, "Visited node": current, "Frontier after step": " → ".join(frontier) or "empty"})
+    else:
+        frontier = [start]
+        while frontier:
+            current = frontier.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            order.append(current)
+            for neighbor in reversed(adjacency[current]):
+                if neighbor not in visited:
+                    frontier.append(neighbor)
+            steps.append({"Step": len(steps) + 1, "Visited node": current, "Frontier after step": " → ".join(frontier) or "empty"})
+    return order, steps, visited
+
+if st.button("Run traversal", key="run_graph_traversal", type="primary"):
+    try:
+        _graph = _parse_graph_edges(_graph_text)
+        if not _graph:
+            raise ValueError("Add at least one edge to define a graph.")
+        _start = _graph_start.strip()
+        _order, _steps, _visited = _traverse_graph(_graph, _start, _graph_method)
+        st.session_state.graph_traversal_result = {
+            "method": _graph_method,
+            "start": _start,
+            "order": _order,
+            "steps": _steps,
+            "visited": sorted(_visited),
+            "total_nodes": len(_graph),
+            "adjacency": _graph,
+        }
+    except ValueError as _graph_error:
+        st.session_state.graph_traversal_error = str(_graph_error)
+        st.session_state.graph_traversal_result = None
+    else:
+        st.session_state.graph_traversal_error = None
+
+if st.session_state.get("graph_traversal_error"):
+    st.error(st.session_state.graph_traversal_error)
+
+_graph_result = st.session_state.get("graph_traversal_result")
+if _graph_result:
+    _r1, _r2, _r3 = st.columns(3)
+    _r1.metric("Nodes in graph", _graph_result["total_nodes"])
+    _r2.metric("Reachable from start", len(_graph_result["visited"]))
+    _r3.metric("Complexity", "O(V + E)")
+    st.markdown("**Traversal order**")
+    st.code("  →  ".join(_graph_result["order"]))
+    _remaining = sorted(set(_graph_result["adjacency"]) - set(_graph_result["visited"]))
+    if _remaining:
+        st.info("Unvisited nodes (disconnected from the start): " + ", ".join(_remaining))
+    st.markdown("**Step trace**")
+    st.dataframe(_graph_result["steps"], use_container_width=True, hide_index=True)
+    with st.expander("Graph adjacency list"):
+        st.json(_graph_result["adjacency"])
+    st.caption("The graph is undirected. Neighbor order follows the order in which edges appear above; traversal order can change if you reorder the edges.")
