@@ -19,6 +19,9 @@ def _merge_count(a):                       # merge sort that also counts inversi
     return out + l[i:] + r[j:], c
 
 def profile(a):                            # = compute_metrics()
+    if not a:
+        raise ValueError("Input array must contain at least one integer.")
+
     n = len(a)
     asc = sum(a[i] <= a[i + 1] for i in range(n - 1)); desc = sum(a[i] >= a[i + 1] for i in range(n - 1))
     s, inv = _merge_count(a); cnt = Counter(s)

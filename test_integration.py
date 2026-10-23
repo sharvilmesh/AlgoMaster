@@ -14,6 +14,12 @@ class TestAlgorithmIntegration(unittest.TestCase):
         self.assertEqual(result["sorted"], sorted(values))
         self.assertEqual(values, [42, 7, 19, 3, 56, 28, 11])
 
+    def test_empty_array_rejected_by_profile(self):
+        with self.assertRaisesRegex(
+            ValueError, "Input array must contain at least one integer."
+        ):
+            profile([])
+
     def test_recommendation_and_c_sort(self):
         values = [42, 7, 19, 3, 56, 28, 11]
         recommendation = recommend_sort(profile(values))
@@ -25,3 +31,4 @@ class TestAlgorithmIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
