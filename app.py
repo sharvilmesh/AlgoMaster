@@ -775,3 +775,147 @@ with lab_bench:
             st.warning(_bench["c_error"] or "C result unavailable; Python benchmark completed.")
             st.caption("The Python measurement is still useful, but it is not a Python-vs-C comparison until the C wrapper loads and passes the correctness check.")
 
+
+
+# ---------- Stack & Queue Playground ----------
+# Interactive, session-persistent data structure demo. This is intentionally
+# implemented in Python first; it can later be connected to the native C engine.
+import html as _html
+
+st.markdown('<div class="section-head">Stack &amp; Queue Playground</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="section-sub">Explore LIFO and FIFO behaviour through real push, pop, enqueue and dequeue operations. '
+    'Your state stays available while you interact with this page.</div>',
+    unsafe_allow_html=True,
+)
+
+st.session_state.setdefault("playground_stack", [])
+st.session_state.setdefault("playground_queue", [])
+st.session_state.setdefault("playground_log", [])
+
+stack_tab, queue_tab, concepts_tab = st.tabs(["Stack · LIFO", "Queue · FIFO", "Concepts"])
+
+def _log_ds(message):
+    st.session_state.playground_log.insert(0, message)
+    st.session_state.playground_log = st.session_state.playground_log[:12]
+
+def _draw_items(items, kind):
+    if not items:
+        st.markdown(
+            '<div style="padding:28px;border:1px dashed #c9c4bb;border-radius:16px;'
+            'text-align:center;color:#77736d;background:#fff">Empty structure · add an item to begin</div>',
+            unsafe_allow_html=True,
+        )
+        return
+    cards = []
+    for idx, value in enumerate(items):
+        safe = _html.escape(str(value))
+        if kind == "stack":
+            label = "TOP" if idx == len(items) - 1 else f"INDEX {idx}"
+        else:
+            label = "FRONT" if idx == 0 else ("REAR" if idx == len(items) - 1 else f"INDEX {idx}")
+        cards.append(
+            '<div style="min-width:86px;max-width:160px;padding:14px 16px;border-radius:14px;'
+            'border:1px solid #dedbd5;background:#fff;text-align:center;box-shadow:0 4px 14px rgba(0,0,0,.04)">'
+            f'<div style="font-size:10px;letter-spacing:1.1px;color:#77736d;font-weight:800;margin-bottom:8px">{label}</div>'
+            f'<div style="font-size:22px;font-weight:800;color:#171717;overflow-wrap:anywhere">{safe}</div></div>'
+        )
+    direction = "column-reverse" if kind == "stack" else "row"
+    st.markdown(
+        f'<div style="display:flex;flex-direction:{direction};flex-wrap:wrap;gap:10px;align-items:center;'
+        f'padding:18px;background:#eeece7;border-radius:18px">{"".join(cards)}</div>',
+        unsafe_allow_html=True,
+    )
+
+with stack_tab:
+    stack = st.session_state.playground_stack
+    sc1, sc2 = st.columns([2, 1])
+    with sc1:
+        stack_value = st.text_input("Value to push", key="stack_input", placeholder="e.g. 42 or task-A")
+    with sc2:
+        st.metric("Stack size", len(stack))
+    a, b, c = st.columns(3)
+    if a.button("＋ Push", key="stack_push", type="primary", use_container_width=True):
+        if not stack_value.strip():
+            st.warning("Enter a value before pushing.")
+        elif len(stack) >= 30:
+            st.warning("Demo limit reached (30 items). Pop an item before adding more.")
+        else:
+            stack.append(stack_value.strip())
+            _log_ds(f"Stack: pushed {stack_value.strip()}")
+            st.rerun()
+    if b.button("Pop top", key="stack_pop", use_container_width=True):
+        if stack:
+            popped = stack.pop()
+            _log_ds(f"Stack: popped {popped}")
+            st.rerun()
+        else:
+            st.warning("Stack underflow: there is nothing to pop.")
+    if c.button("Peek top", key="stack_peek", use_container_width=True):
+        if stack:
+            st.info(f"Top element: **{stack[-1]}**")
+        else:
+            st.warning("The stack is empty.")
+    _draw_items(stack, "stack")
+    st.caption("LIFO · Last In, First Out · Push and pop operate at the top.")
+    if st.button("Clear stack", key="stack_clear"):
+        st.session_state.playground_stack = []
+        _log_ds("Stack: cleared")
+        st.rerun()
+
+with queue_tab:
+    queue = st.session_state.playground_queue
+    qc1, qc2 = st.columns([2, 1])
+    with qc1:
+        queue_value = st.text_input("Value to enqueue", key="queue_input", placeholder="e.g. request-01")
+    with qc2:
+        st.metric("Queue size", len(queue))
+    a, b, c = st.columns(3)
+    if a.button("＋ Enqueue", key="queue_enqueue", type="primary", use_container_width=True):
+        if not queue_value.strip():
+            st.warning("Enter a value before enqueueing.")
+        elif len(queue) >= 30:
+            st.warning("Demo limit reached (30 items). Dequeue an item before adding more.")
+        else:
+            queue.append(queue_value.strip())
+            _log_ds(f"Queue: enqueued {queue_value.strip()}")
+            st.rerun()
+    if b.button("Dequeue front", key="queue_dequeue", use_container_width=True):
+        if queue:
+            removed = queue.pop(0)
+            _log_ds(f"Queue: dequeued {removed}")
+            st.rerun()
+        else:
+            st.warning("Queue underflow: there is nothing to dequeue.")
+    if c.button("Peek front", key="queue_peek", use_container_width=True):
+        if queue:
+            st.info(f"Front element: **{queue[0]}**")
+        else:
+            st.warning("The queue is empty.")
+    _draw_items(queue, "queue")
+    st.caption("FIFO · First In, First Out · Enqueue at the rear, dequeue from the front.")
+    if st.button("Clear queue", key="queue_clear"):
+        st.session_state.playground_queue = []
+        _log_ds("Queue: cleared")
+        st.rerun()
+
+with concepts_tab:
+    st.markdown(
+        """
+        | Operation | Stack | Queue |
+        |---|---:|---:|
+        | Add item | Push · O(1) | Enqueue · O(1) amortized with a deque |
+        | Remove item | Pop top · O(1) | Dequeue · O(1) amortized with a deque |
+        | Inspect next item | Peek top · O(1) | Peek front · O(1) |
+        | Rule | LIFO | FIFO |
+
+        **Where they show up:** stacks power undo operations, function calls and expression parsing; queues help schedule tasks, process requests and manage breadth-first search frontiers.
+
+        *This playground uses Python lists for clarity. Removing the front of a list is O(n); a production queue would typically use `collections.deque` or a dedicated queue implementation.*
+        """
+    )
+
+if st.session_state.playground_log:
+    with st.expander("Recent operations", expanded=False):
+        for entry in st.session_state.playground_log:
+            st.write(f"• {entry}")
