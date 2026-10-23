@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.dll
+*.backup
+.venv/
+venv/
+.env

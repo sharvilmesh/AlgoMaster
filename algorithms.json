@@ -1,0 +1,9 @@
+{"factors":{"quick":1.9,"merge":2.9,"heap":3.5},
+ "algorithms":[
+ {"name":"Insertion Sort","best":"n","avg":"n^2","worst":"n^2","space":"1","stable":true,"inplace":true,"worst_nlogn":false,"trade_off":"very fast on nearly sorted or tiny data, but O(n^2) otherwise"},
+ {"name":"Bubble Sort","best":"n","avg":"n^2","worst":"n^2","space":"1","stable":true,"inplace":true,"worst_nlogn":false,"trade_off":"simple, but almost always beaten by Insertion Sort"},
+ {"name":"Selection Sort","best":"n^2","avg":"n^2","worst":"n^2","space":"1","stable":false,"inplace":true,"worst_nlogn":false,"trade_off":"always n^2 comparisons, but never more than n-1 swaps"},
+ {"name":"Merge Sort","best":"n log n","avg":"n log n","worst":"n log n","space":"n","stable":true,"inplace":false,"worst_nlogn":true,"trade_off":"stable with guaranteed O(n log n), but needs O(n) extra memory"},
+ {"name":"Quick Sort","best":"n log n","avg":"n log n","worst":"n^2","space":"log n","stable":false,"inplace":true,"worst_nlogn":false,"trade_off":"in-place and fastest on average, but O(n^2) worst case and not stable"},
+ {"name":"Heap Sort","best":"n log n","avg":"n log n","worst":"n log n","space":"1","stable":false,"inplace":true,"worst_nlogn":true,"trade_off":"guaranteed O(n log n) with O(1) memory, but slower in practice"}
+]}
