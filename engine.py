@@ -90,7 +90,15 @@ def recommend_sort(p, is_list=False, stable=False, worst=False, mem=False):
     allowed = sum(ok); win = min((i for i in range(6) if ok[i]), key=lambda i: c[i])
     order = sorted(range(6), key=lambda i: (not ok[i], c[i]))
     fok, _ = eligible(is_list, False, False, False); fbest = min((i for i in range(6) if fok[i]), key=lambda i: c[i])
-    alts = [{"algorithm": nm(t), "times_work": round(c[t] / c[win], 1), "trade_off": A[t]["trade_off"]} for t in order[1:3] if ok[t] and allowed > 1]
+    alts = [
+        {
+            "algorithm": nm(t),
+            "times_work": round(c[t] / c[win], 1) if c[win] > 0 else (1.0 if c[t] == 0 else float("inf")),
+            "trade_off": A[t]["trade_off"],
+        }
+        for t in order[1:3]
+        if ok[t] and allowed > 1
+    ]
     return {"kind": "Sorting", "title": f"Sorting | n={p['n']} | {nm(win)}",
             "constraints": f"storage = {'linked list' if is_list else 'array'} | stable = {s0} | memory tight = {m0} | worst-case guarantee = {w0}",
             "note": ("Your constraints contradict each other. Relaxed: " + ", ".join(relaxed)) if relaxed else "",
@@ -123,6 +131,11 @@ def recommend_search(p, is_list, Q, U=0):
     name = "Binary Search" if use_bin else "Linear Search"
     ds = "Sorted array" if use_bin else ("Linked list (as chosen)" if is_list else "Array (no need to keep it sorted)")
     other = "Linear Search" if use_bin else "Binary Search"
+    alt_ratio = (
+        (lin / binary if use_bin else binary / lin)
+        if (binary if use_bin else lin) > 0
+        else 1.0
+    )
     return {"kind": "Searching", "title": f"Searching | n={n} | {name}",
             "constraints": f"n = {n} | storage = {'linked list' if is_list else 'array'} | sorted now = {p['sorted']} | searches = {Q} | updates = {U}",
             "note": "", "warning": "", "recommended": name + ("" if p["sorted"] or not use_bin else f" (after sorting with {nm(best)})"),
@@ -132,6 +145,6 @@ def recommend_search(p, is_list, Q, U=0):
             "properties": f"For n = {n}: Linear about {per_lin:.0f} comparisons/search, Binary about {per_bin:.1f}",
             "ranking": [{"Algorithm": "Linear Search", "Est. steps": round(lin), "Status": "chosen" if not use_bin else "allowed"},
                         {"Algorithm": "Binary Search", "Est. steps": round(binary), "Status": "chosen" if use_bin else ("not possible on linked list" if is_list else "allowed")}],
-            "alternatives": [{"algorithm": other, "times_work": round((lin / binary if use_bin else binary / lin), 1),
+            "alternatives": [{"algorithm": other, "times_work": round(alt_ratio, 1),
                               "trade_off": "simple, works on unsorted data and linked lists, but O(n) per search" if use_bin else "O(log n) per search, but needs a sorted array plus sorting/upkeep cost"}],
             "alt_note": ""}
